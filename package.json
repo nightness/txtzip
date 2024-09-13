@@ -1,7 +1,7 @@
 {
   "name": "txtzip",
-  "version": "1.0.0",
-  "description": "Text Zipper for Developers",
+  "version": "1.0.3",
+  "description": "Text file bundling tool that preserves file structure",
   "main": "dist/index.js",
   "type": "module",
   "keywords": [],
@@ -21,11 +21,17 @@
   "devDependencies": {
     "@types/node": "^20.16.2",
     "@types/yargs": "^17.0.33",
-    "nodemon": "^3.1.4",
-    "ts-node": "^10.0.0",
     "typescript": "^5.5.4"
   },
-  "author": "",
+"repository": {
+    "type": "git",
+    "url": "https://github.com/nightness/txtzip.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nightness/txtzip/issues"
+  },
+  "homepage": "https://github.com/nightness/txtzip#readme",
+  "author": "nightness",
   "license": "ISC",
   "files": [
     "dist"

@@ -8,6 +8,11 @@ import { createInterface } from 'readline';
 import { existsSync, createReadStream } from 'fs';
 import ignore, { Ignore } from 'ignore';
 
+const additionalIgnoredFiles = [
+  '.DS_Store', 'Thumbs.db', 'desktop.ini',
+  '.vscode', '.idea', '.git', '.gitignore', 'node_modules', 'package-lock.json', 'yarn.lock'
+];
+
 // Define command-line argument types
 interface Args {
   source: string;
@@ -79,8 +84,8 @@ async function getFilesRecursively(dir: string, ig: Ignore): Promise<string[]> {
     const fullPath = path.join(dir, entry.name);
     const relativePath = path.relative(sourceFolder, fullPath);
 
-    // Skip the .git directory manually
-    if (entry.name === '.git' || entry.name === '.gitignore') {
+    // Skip additional ignored files
+    if (additionalIgnoredFiles.includes(entry.name)) {
       continue;
     }
 

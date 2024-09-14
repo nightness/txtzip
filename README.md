@@ -12,6 +12,8 @@
 - **Include Only Source Code Files**: Use the `--source-only` (`-S`) flag to include only files with source code related extensions.
 - **Strip Empty Lines**: Use the `--strip-empty-lines` (`-e`) flag to remove empty lines from files.
 - **Environment Variable Support**: Set default command-line arguments using the `TXTZIP_ARGS` environment variable.
+- **Check for Updates**: Use the `--check-update` (`-u`) flag to check if a newer version is available.
+- **Version Command**: Use the `--version` (`-v`) flag to display the current version.
 - **Help Command**: Use the `--help` (`-h`) flag to display detailed help information.
 - Perfect for **sharing source files**, **preparing archives**, or **uploading to AI prompts**.
 
@@ -46,7 +48,9 @@ txtzip --source ./your-folder --output ./your-output.txt
 - **`--overwrite`** (`-w`): Overwrite the output file if it exists.
 - **`--source-only`** (`-S`): Only include files with source code related extensions.
 - **`--strip-empty-lines`** (`-e`): Strip empty lines from files.
+- **`--check-update`** (`-u`): Check for the latest version available.
 - **`--help`** (`-h`): Show help information about the command-line options.
+- **`--version`** (`-v`): Show the current version.
 
 ### Environment Variable:
 
@@ -78,6 +82,22 @@ You can set default command-line arguments using the `TXTZIP_ARGS` environment v
   ```
 
 ### Examples
+
+#### **Check for Updates**
+
+Check if a newer version of `txtzip` is available:
+
+```bash
+npx txtzip --check-update
+```
+
+#### **Show Version**
+
+Display the current version:
+
+```bash
+npx txtzip --version
+```
 
 #### **Overwrite Output File**
 
@@ -113,6 +133,22 @@ export TXTZIP_ARGS="-wS"
 npx txtzip --source ./src --output ./output.txt --strip-empty-lines
 ```
 
+### Getting Help
+
+To display detailed help information:
+
+```bash
+npx txtzip --help
+```
+
+or
+
+```bash
+txtzip -h
+```
+
+This will display information about all available options, along with usage examples.
+
 ### Example Output
 
 ```
@@ -138,7 +174,7 @@ export function helper() {
 ### Clone the repository
 
 ```bash
-git clone https://github.com/your-username/txtzip.git
+git clone https://github.com/nightness/txtzip.git
 cd txtzip
 npm install
 ```

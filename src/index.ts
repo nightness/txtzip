@@ -1,12 +1,18 @@
 #!/usr/bin/env node
 
 import { readdir, stat, readFile, writeFile, unlink } from 'fs/promises';
+import { readFileSync } from 'fs';
 import path from 'path';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { createInterface } from 'readline';
 import { existsSync, createReadStream } from 'fs';
 import ignore, { Ignore } from 'ignore';
+import https from 'https';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const additionalIgnoredFiles = [
   '.DS_Store', 'Thumbs.db', 'desktop.ini',
@@ -20,6 +26,7 @@ interface Args {
   overwrite: boolean;
   'source-only': boolean;
   'strip-empty-lines': boolean;
+  'check-update': boolean;
 }
 
 // Function to parse environment variable arguments into an array
@@ -32,9 +39,11 @@ function parseEnvArgs(envArgs: string | undefined): string[] {
 // Parse environment variable arguments
 const envArgs = parseEnvArgs(process.env.TXTZIP_ARGS);
 
-// Setup command-line arguments with explicit typing
+// Combine environment variable arguments with command-line arguments
+// Command-line arguments take precedence
 const argv = yargs([...envArgs, ...hideBin(process.argv)])
   .usage('Usage: txtzip [options]')
+  .wrap(process.stdout.columns || 80) // Set the wrap width to the terminal width
   .options({
     source: {
       alias: 's',
@@ -45,8 +54,9 @@ const argv = yargs([...envArgs, ...hideBin(process.argv)])
     output: {
       alias: 'o',
       type: 'string',
-      description: 'Output file name (defaults to text-archive.txt in the current directory)',
-      default: path.join(process.cwd(), 'text-archive.txt'),
+      description:
+        'Output file name (defaults to text-archive.txt in the current directory)',
+      default: './text-archive.txt',
     },
     overwrite: {
       alias: 'w',
@@ -66,26 +76,30 @@ const argv = yargs([...envArgs, ...hideBin(process.argv)])
       description: 'Strip empty lines from files',
       default: false,
     },
+    'check-update': {
+      alias: 'u',
+      type: 'boolean',
+      description: 'Check for the latest version available',
+      default: false,
+    },
+    // **Do not define a 'version' option here**
   })
   .alias('help', 'h')
+  .alias('version', 'v')
+  .version()
   .help('help')
   .epilog('For more information, visit https://github.com/nightness/txtzip')
-  .example([
-    [
-      'txtzip --source ./src --output ./output.txt',
-      'Bundle all text files from ./src to ./output.txt',
-    ],
-    ['txtzip -w', 'Overwrite the output file if it exists'],
-    ['txtzip -S -e', 'Include only source code files and strip empty lines'],
-  ])
   .argv as Args;
 
 // Extract the values for command-line arguments
-const sourceFolder = argv.source;
-const outputFile = argv.output;
-const overwriteOutput = argv.overwrite;
-const sourceOnly = argv['source-only'];
-const stripEmptyLines = argv['strip-empty-lines'];
+const {
+  source: sourceFolder,
+  output: outputFile,
+  overwrite: overwriteOutput,
+  'source-only': sourceOnly,
+  'strip-empty-lines': stripEmptyLines,
+  'check-update': checkUpdate,
+} = argv;
 
 // List of common source code file extensions
 const sourceCodeExtensions = [
@@ -221,5 +235,62 @@ async function createTextArchive(sourceFolder: string): Promise<void> {
   }
 }
 
-// Start the process
-createTextArchive(sourceFolder);
+// Function to check for the latest version on npm
+function checkForLatestVersion() {
+  const packageName = 'txtzip';
+  const npmRegistryUrl = `https://registry.npmjs.org/${packageName}`;
+
+  // Read the current version from package.json
+  const packageJsonPath = path.join(__dirname, '..', 'package.json');
+  let currentVersion = '';
+
+  try {
+    const packageJsonContent = readFileSync(packageJsonPath, 'utf8');
+    const packageJson = JSON.parse(packageJsonContent);
+    currentVersion = packageJson.version;
+    console.log(`Current version: ${currentVersion}`);
+  } catch (error) {
+    console.error('Failed to read package.json:', error);
+    process.exit(1);
+  }
+
+  https
+    .get(npmRegistryUrl, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          const npmData = JSON.parse(data);
+          const latestVersion = npmData['dist-tags'].latest;
+
+          if (latestVersion !== currentVersion) {
+            console.log(
+              `A new version of ${packageName} is available: ${latestVersion}. You are using version ${currentVersion}.`
+            );
+            console.log(
+              `Run 'npm install -g ${packageName}' to update to the latest version.`
+            );
+          } else {
+            console.log(`You are using the latest version (${currentVersion}).`);
+          }
+        } catch (error) {
+          console.error('Failed to parse npm registry data:', error);
+        }
+      });
+    })
+    .on('error', (err) => {
+      console.error('Failed to check for latest version:', err);
+    });
+}
+
+// Main execution
+if (checkUpdate) {
+  checkForLatestVersion();
+} else {
+  // Start the main process
+  createTextArchive(sourceFolder);
+}

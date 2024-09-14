@@ -24,46 +24,51 @@ interface Args {
 
 // Setup command-line arguments with explicit typing
 const argv = yargs(hideBin(process.argv))
+  .usage('Usage: txtzip [options]')
   .options({
     source: {
       alias: 's',
       type: 'string',
-      description: 'Source folder to archive',
+      description: 'Source folder to archive (defaults to current working directory)',
       default: process.cwd(),
-      demandOption: false,
     },
     output: {
       alias: 'o',
       type: 'string',
-      description: 'Output file name (defaults to current working directory)',
+      description: 'Output file name (defaults to text-archive.txt in the current directory)',
       default: path.join(process.cwd(), 'text-archive.txt'),
-      demandOption: false,
     },
     overwrite: {
       alias: 'w',
       type: 'boolean',
       description: 'Overwrite the output file if it exists',
       default: false,
-      demandOption: false,
     },
     'source-only': {
       alias: 'S',
       type: 'boolean',
       description: 'Only include files with source code related extensions',
       default: false,
-      demandOption: false,
     },
     'strip-empty-lines': {
       alias: 'e',
       type: 'boolean',
       description: 'Strip empty lines from files',
       default: false,
-      demandOption: false,
     },
   })
-  .strict()
-  .help()
-  .parseSync() as Args;
+  .alias('help', 'h')
+  .help('help')
+  .epilog('For more information, visit https://github.com/nightness/txtzip')
+  .example([
+    [
+      'txtzip --source ./src --output ./output.txt',
+      'Bundle all text files from ./src to ./output.txt',
+    ],
+    ['txtzip -w', 'Overwrite the output file if it exists'],
+    ['txtzip -S -e', 'Include only source code files and strip empty lines'],
+  ])
+  .argv as Args;
 
 // Extract the values for command-line arguments
 const sourceFolder = argv.source;
@@ -79,7 +84,7 @@ const sourceCodeExtensions = [
   '.ps1', '.pl', '.lua', '.sql', '.scala', '.groovy', '.hs', '.erl', '.ex',
   '.exs', '.r', '.jl', '.f90', '.f95', '.f03', '.clj', '.cljc', '.cljs',
   '.coffee', '.dart', '.elm', '.fs', '.fsi', '.fsx', '.fsscript', '.gd',
-  '.hbs', '.idr', '.nim', '.ml', '.mli', '.mll', '.mly', '.nim', '.php',
+  '.hbs', '.idr', '.nim', '.ml', '.mli', '.mll', '.mly', '.php',
   '.purs', '.rkt', '.vb', '.vbs', '.vba', '.feature', '.s', '.asm', '.sln',
   '.md', '.markdown', '.yml', '.yaml', '.json', '.xml', '.html', '.css',
   '.scss', '.less', '.ini', '.conf', '.config', '.toml', '.tex', '.bib',
@@ -89,7 +94,11 @@ const sourceCodeExtensions = [
 function isBinaryFile(contentBuffer: Buffer): boolean {
   for (let i = 0; i < 24 && i < contentBuffer.length; i++) {
     const charCode = contentBuffer[i];
-    if ((charCode > 0 && charCode < 9) || (charCode > 13 && charCode < 32) || charCode === 127) {
+    if (
+      (charCode > 0 && charCode < 9) ||
+      (charCode > 13 && charCode < 32) ||
+      charCode === 127
+    ) {
       return true;
     }
   }
@@ -116,7 +125,10 @@ async function loadIgnorePatterns(sourceFolder: string): Promise<Ignore> {
 }
 
 // Recursive function to traverse directories and return a list of files
-async function getFilesRecursively(dir: string, ig: Ignore): Promise<string[]> {
+async function getFilesRecursively(
+  dir: string,
+  ig: Ignore
+): Promise<string[]> {
   let files: string[] = [];
   const entries = await readdir(dir, { withFileTypes: true });
 

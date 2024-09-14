@@ -49,7 +49,7 @@ const argv = yargs([...envArgs, ...hideBin(process.argv)])
       alias: 's',
       type: 'string',
       description: 'Source folder to archive (defaults to current working directory)',
-      default: process.cwd(),
+      default: '.',
     },
     output: {
       alias: 'o',
@@ -193,9 +193,16 @@ async function createTextArchive(sourceFolder: string): Promise<void> {
     const ig = await loadIgnorePatterns(sourceFolder); // Load ignore patterns from .gitignore
     const allFiles = await getFilesRecursively(sourceFolder, ig);
 
+    const outputFileExists = existsSync(outputFile);
+
     // Overwrite output file if the flag is set
-    if (overwriteOutput && existsSync(outputFile)) {
+    if (overwriteOutput && outputFileExists) {
       await unlink(outputFile);
+    } else if (outputFileExists) {
+      console.error(
+        `Output file already exists: ${outputFile}. Use the -w flag to overwrite it.`
+      );
+      return;
     }
 
     let archiveBuffer = ''; // Memory buffer for storing file contents

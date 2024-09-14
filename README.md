@@ -1,6 +1,6 @@
 # **txtzip**
 
-`txtzip` is a simple command-line tool for developers that zips all the text files in a project folder into a single text file. It respects `.gitignore` and automatically ignores the `.git` folder, making it easy to bundle up your source code for sharing or archiving without any binary files.
+`txtzip` is a simple command-line tool for developers that zips all the text files in a project folder into a single text file. It respects `.gitignore` and automatically ignores the `.git` folder, making it easy to bundle up your source code for sharing with ChatGPT or other LLM.
 
 ## Features
 

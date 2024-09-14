@@ -11,6 +11,8 @@
 - **Overwrite Output File**: Use the `--overwrite` (`-w`) flag to overwrite the output file if it exists.
 - **Include Only Source Code Files**: Use the `--source-only` (`-S`) flag to include only files with source code related extensions.
 - **Strip Empty Lines**: Use the `--strip-empty-lines` (`-e`) flag to remove empty lines from files.
+- **Environment Variable Support**: Set default command-line arguments using the `TXTZIP_ARGS` environment variable.
+- **Help Command**: Use the `--help` (`-h`) flag to display detailed help information.
 - Perfect for **sharing source files**, **preparing archives**, or **uploading to AI prompts**.
 
 ## Installation
@@ -39,11 +41,41 @@ txtzip --source ./your-folder --output ./your-output.txt
 
 ### Command-line options:
 
-- **`--source`** (`-s`) (optional): The source folder to archive. Defaults to the current working directory.
-- **`--output`** (`-o`) (optional): The output file name for the text archive. Defaults to `text-archive.txt`.
+- **`--source`** (`-s`): The source folder to archive. Defaults to the current working directory.
+- **`--output`** (`-o`): The output file name for the text archive. Defaults to `text-archive.txt` in the current directory.
 - **`--overwrite`** (`-w`): Overwrite the output file if it exists.
 - **`--source-only`** (`-S`): Only include files with source code related extensions.
 - **`--strip-empty-lines`** (`-e`): Strip empty lines from files.
+- **`--help`** (`-h`): Show help information about the command-line options.
+
+### Environment Variable:
+
+You can set default command-line arguments using the `TXTZIP_ARGS` environment variable.
+
+#### **`TXTZIP_ARGS`**:
+
+- Contains default command-line arguments as a string (e.g., `"-wSe"`).
+- Arguments specified in `TXTZIP_ARGS` are parsed and used as defaults.
+- **Note**: Command-line arguments provided when running the program will override these defaults.
+
+**Examples:**
+
+- **Set `TXTZIP_ARGS` to include `-w`, `-S`, and `-e` flags:**
+
+  ```bash
+  export TXTZIP_ARGS="-wSe"
+
+  npx txtzip --source ./src --output ./output.txt
+  ```
+
+- **Override an argument from `TXTZIP_ARGS`:**
+
+  ```bash
+  export TXTZIP_ARGS="-wSe"
+
+  # Override the overwrite flag to false
+  npx txtzip --source ./src --output ./output.txt --no-overwrite
+  ```
 
 ### Examples
 
@@ -73,25 +105,13 @@ npx txtzip --source ./src --output ./output.txt --strip-empty-lines
 
 #### **Combining Flags**
 
-You can combine multiple flags to customize the output:
+You can combine multiple flags and environment variables to customize the output:
 
 ```bash
-npx txtzip --source ./src --output ./output.txt --overwrite --source-only --strip-empty-lines
+export TXTZIP_ARGS="-wS"
+
+npx txtzip --source ./src --output ./output.txt --strip-empty-lines
 ```
-
-### Explanation of New Flags
-
-- **`--overwrite`** (`-w`):
-
-  If this flag is set, the program will delete the existing output file before creating a new one. This ensures that the output file doesn't get accidentally included in the archive.
-
-- **`--source-only`** (`-S`):
-
-  When this flag is set, the program will only include files with common source code extensions, such as `.js`, `.ts`, `.py`, `.java`, etc. This is useful for focusing on source code and excluding other text files like documentation or configuration files.
-
-- **`--strip-empty-lines`** (`-e`):
-
-  If this flag is set, the program will remove empty lines from the file contents before adding them to the archive. This can help reduce the size of the archive and make the content more concise.
 
 ### Example Output
 

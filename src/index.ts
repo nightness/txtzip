@@ -22,8 +22,18 @@ interface Args {
   'strip-empty-lines': boolean;
 }
 
+// Function to parse environment variable arguments into an array
+function parseEnvArgs(envArgs: string | undefined): string[] {
+  if (!envArgs) return [];
+  // Use a simple regex to split arguments similar to a shell
+  return envArgs.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+}
+
+// Parse environment variable arguments
+const envArgs = parseEnvArgs(process.env.TXTZIP_ARGS);
+
 // Setup command-line arguments with explicit typing
-const argv = yargs(hideBin(process.argv))
+const argv = yargs([...envArgs, ...hideBin(process.argv)])
   .usage('Usage: txtzip [options]')
   .options({
     source: {

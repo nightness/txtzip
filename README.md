@@ -7,6 +7,7 @@
 - **Collects all text files** from a folder into a single archive.
 - **Respects `.gitignore` rules** to exclude ignored files and folders.
 - **Automatically skips the `.git` folder** to prevent including Git metadata.
+- **Include or Exclude Files**: Use the `--include` (`-i`) and `--exclude` (`-x`) options to include or exclude files based on glob patterns.
 - **Outputs a clean, readable text archive** with delineations showing file paths.
 - **Overwrite Output File**: Use the `--overwrite` (`-w`) flag to overwrite the output file if it exists.
 - **Include Only Source Code Files**: Use the `--source-only` (`-S`) flag to include only files with source code related extensions.
@@ -48,6 +49,8 @@ txtzip --source ./your-folder --output ./your-output.txt
 - **`--overwrite`** (`-w`): Overwrite the output file if it exists.
 - **`--source-only`** (`-S`): Only include files with source code related extensions.
 - **`--strip-empty-lines`** (`-e`): Strip empty lines from files.
+- **`--include`** (`-i`): Include files matching the given glob patterns. Can be specified multiple times.
+- **`--exclude`** (`-x`): Exclude files matching the given glob patterns. Can be specified multiple times.
 - **`--check-update`** (`-u`): Check for the latest version available.
 - **`--help`** (`-h`): Show help information about the command-line options.
 - **`--version`** (`-v`): Show the current version.
@@ -82,6 +85,20 @@ You can set default command-line arguments using the `TXTZIP_ARGS` environment v
   ```
 
 ### Examples
+
+#### **Include and Exclude Patterns**
+
+- **Include only `.ts` and `.js` files:**
+
+  ```bash
+  txtzip -i "*.ts" -i "*.js" --source ./src --output ./output.txt
+  ```
+
+- **Exclude test files and node_modules:**
+
+  ```bash
+  txtzip -x "*.test.js" -x "node_modules/**" --source ./src --output ./output.txt
+  ```
 
 #### **Check for Updates**
 

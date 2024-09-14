@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readdir, stat, readFile, writeFile } from 'fs/promises';
+import { readdir, stat, readFile, writeFile, unlink } from 'fs/promises';
 import path from 'path';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -17,6 +17,9 @@ const additionalIgnoredFiles = [
 interface Args {
   source: string;
   output: string;
+  overwrite: boolean;
+  'source-only': boolean;
+  'strip-empty-lines': boolean;
 }
 
 // Setup command-line arguments with explicit typing
@@ -36,14 +39,51 @@ const argv = yargs(hideBin(process.argv))
       default: path.join(process.cwd(), 'text-archive.txt'),
       demandOption: false,
     },
+    overwrite: {
+      alias: 'w',
+      type: 'boolean',
+      description: 'Overwrite the output file if it exists',
+      default: false,
+      demandOption: false,
+    },
+    'source-only': {
+      alias: 'S',
+      type: 'boolean',
+      description: 'Only include files with source code related extensions',
+      default: false,
+      demandOption: false,
+    },
+    'strip-empty-lines': {
+      alias: 'e',
+      type: 'boolean',
+      description: 'Strip empty lines from files',
+      default: false,
+      demandOption: false,
+    },
   })
   .strict()
   .help()
   .parseSync() as Args;
 
-// Extract the values for source and output
+// Extract the values for command-line arguments
 const sourceFolder = argv.source;
 const outputFile = argv.output;
+const overwriteOutput = argv.overwrite;
+const sourceOnly = argv['source-only'];
+const stripEmptyLines = argv['strip-empty-lines'];
+
+// List of common source code file extensions
+const sourceCodeExtensions = [
+  '.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.c', '.cpp', '.h', '.hpp',
+  '.cs', '.go', '.rb', '.php', '.swift', '.kt', '.kts', '.rs', '.sh', '.bat',
+  '.ps1', '.pl', '.lua', '.sql', '.scala', '.groovy', '.hs', '.erl', '.ex',
+  '.exs', '.r', '.jl', '.f90', '.f95', '.f03', '.clj', '.cljc', '.cljs',
+  '.coffee', '.dart', '.elm', '.fs', '.fsi', '.fsx', '.fsscript', '.gd',
+  '.hbs', '.idr', '.nim', '.ml', '.mli', '.mll', '.mly', '.nim', '.php',
+  '.purs', '.rkt', '.vb', '.vbs', '.vba', '.feature', '.s', '.asm', '.sln',
+  '.md', '.markdown', '.yml', '.yaml', '.json', '.xml', '.html', '.css',
+  '.scss', '.less', '.ini', '.conf', '.config', '.toml', '.tex', '.bib',
+];
 
 // Function to check if a file is binary or text
 function isBinaryFile(contentBuffer: Buffer): boolean {
@@ -97,6 +137,13 @@ async function getFilesRecursively(dir: string, ig: Ignore): Promise<string[]> {
     if (entry.isDirectory()) {
       files = files.concat(await getFilesRecursively(fullPath, ig));
     } else {
+      // If source-only flag is set, filter by source code extensions
+      if (sourceOnly) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (!sourceCodeExtensions.includes(ext)) {
+          continue;
+        }
+      }
       files.push(fullPath);
     }
   }
@@ -109,6 +156,12 @@ async function createTextArchive(sourceFolder: string): Promise<void> {
   try {
     const ig = await loadIgnorePatterns(sourceFolder); // Load ignore patterns from .gitignore
     const allFiles = await getFilesRecursively(sourceFolder, ig);
+
+    // Overwrite output file if the flag is set
+    if (overwriteOutput && existsSync(outputFile)) {
+      await unlink(outputFile);
+    }
+
     let archiveBuffer = ''; // Memory buffer for storing file contents
 
     for (const file of allFiles) {
@@ -116,13 +169,23 @@ async function createTextArchive(sourceFolder: string): Promise<void> {
 
       // Only consider regular files
       if (fileStats.isFile()) {
-        const content = await readFile(file);
+        const contentBuffer = await readFile(file);
 
         // Skip binary files
-        if (!isBinaryFile(content)) {
+        if (!isBinaryFile(contentBuffer)) {
           const relativePath = path.relative(sourceFolder, file);
+          let content = contentBuffer.toString('utf8');
+
+          // Strip empty lines if the flag is set
+          if (stripEmptyLines) {
+            content = content
+              .split('\n')
+              .filter((line) => line.trim() !== '')
+              .join('\n');
+          }
+
           archiveBuffer += `\n=== Start of File: ${relativePath} ===\n`;
-          archiveBuffer += content.toString('utf8');
+          archiveBuffer += content;
           archiveBuffer += `\n=== End of File: ${relativePath} ===\n`;
         }
       }

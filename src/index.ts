@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 
 import { readdir, stat, readFile, writeFile, unlink } from 'fs/promises';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync, createReadStream } from 'fs';
 import path from 'path';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { createInterface } from 'readline';
-import { existsSync, createReadStream } from 'fs';
 import ignore, { Ignore } from 'ignore';
 import https from 'https';
-import { fileURLToPath } from 'url';
+import { minimatch } from 'minimatch';
 
+import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -27,6 +27,8 @@ interface Args {
   'source-only': boolean;
   'strip-empty-lines': boolean;
   'check-update': boolean;
+  include: string[];
+  exclude: string[];
 }
 
 // Function to parse environment variable arguments into an array
@@ -82,7 +84,18 @@ const argv = yargs([...envArgs, ...hideBin(process.argv)])
       description: 'Check for the latest version available',
       default: false,
     },
-    // **Do not define a 'version' option here**
+    include: {
+      alias: 'i',
+      type: 'array',
+      description: 'Include files matching the given glob patterns',
+      default: [],
+    },
+    exclude: {
+      alias: 'x',
+      type: 'array',
+      description: 'Exclude files matching the given glob patterns',
+      default: [],
+    },
   })
   .alias('help', 'h')
   .alias('version', 'v')
@@ -99,6 +112,8 @@ const {
   'source-only': sourceOnly,
   'strip-empty-lines': stripEmptyLines,
   'check-update': checkUpdate,
+  include: includePatterns,
+  exclude: excludePatterns,
 } = argv;
 
 // List of common source code file extensions
@@ -180,7 +195,32 @@ async function getFilesRecursively(
           continue;
         }
       }
-      files.push(fullPath);
+
+      // Apply include and exclude patterns
+      let includeFile = true;
+
+      // Check exclude patterns
+      for (const pattern of excludePatterns) {
+        if (minimatch(relativePath, pattern)) {
+          includeFile = false;
+          break;
+        }
+      }
+
+      // Check include patterns
+      if (includePatterns.length > 0) {
+        includeFile = false;
+        for (const pattern of includePatterns) {
+          if (minimatch(relativePath, pattern)) {
+            includeFile = true;
+            break;
+          }
+        }
+      }
+
+      if (includeFile) {
+        files.push(fullPath);
+      }
     }
   }
 

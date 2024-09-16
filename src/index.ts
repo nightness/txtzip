@@ -37,6 +37,25 @@ function parseEnvArgs(envArgs: string | undefined): string[] {
   return envArgs.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
 }
 
+// Parse environment variable arguments
+const envArgs = parseEnvArgs(process.env.TXTZIP_ARGS);
+
+// Initial parse to get 'source' option
+const initialArgv = yargs([...envArgs, ...hideBin(process.argv)])
+  .options({
+    source: {
+      alias: 's',
+      type: 'string',
+      default: '.',
+    },
+  })
+  .help(false)
+  .version(false)
+  .parseSync();
+
+// Resolve the source folder to an absolute path
+const sourceFolder = path.resolve(initialArgv.source);
+
 // Load the `txtzip.json` configuration file if it exists
 function loadConfigFromFile(sourceFolder: string): Partial<Args> {
   const configFile = path.join(sourceFolder, 'txtzip.json');
@@ -51,13 +70,10 @@ function loadConfigFromFile(sourceFolder: string): Partial<Args> {
   return {};
 }
 
-// Parse environment variable arguments
-const envArgs = parseEnvArgs(process.env.TXTZIP_ARGS);
+// Load defaults from `txtzip.json` if it exists in the source folder
+const configDefaults = loadConfigFromFile(sourceFolder);
 
-// Load defaults from `txtzip.json` if it exists
-const configDefaults = loadConfigFromFile(process.cwd());
-
-// Combine environment variable arguments, config file arguments, and command-line arguments
+// Now parse argv again, providing 'configDefaults' as defaults
 const argv = yargs([...envArgs, ...hideBin(process.argv)])
   .usage('Usage: txtzip [options]')
   .wrap(process.stdout.columns || 80) // Set the wrap width to the terminal width
@@ -116,12 +132,12 @@ const argv = yargs([...envArgs, ...hideBin(process.argv)])
   .version()
   .help('help')
   .epilog('For more information, visit https://github.com/nightness/txtzip')
-  .argv as Args;
+  .parseSync() as Args;
 
 // Extract the values for command-line arguments
 const {
-  source: sourceFolder,
-  output: outputFile,
+  source,
+  output,
   overwrite: overwriteOutput,
   'source-only': sourceOnly,
   'strip-empty-lines': stripEmptyLines,
@@ -130,6 +146,10 @@ const {
   exclude: excludePatterns,
 } = argv;
 
+// Resolve paths to absolute paths
+const resolvedSourceFolder = path.resolve(sourceFolder);
+const resolvedOutputFile = path.resolve(output);
+
 // List of common source code file extensions
 const sourceCodeExtensions = [
   '.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.c', '.cpp', '.h', '.hpp',
@@ -137,12 +157,11 @@ const sourceCodeExtensions = [
   '.ps1', '.pl', '.lua', '.sql', '.scala', '.groovy', '.hs', '.erl', '.ex',
   '.exs', '.r', '.jl', '.f90', '.f95', '.f03', '.clj', '.cljc', '.cljs',
   '.coffee', '.dart', '.elm', '.fs', '.fsi', '.fsx', '.fsscript', '.gd',
-  '.hbs', '.idr', '.nim', '.ml', '.mli', '.mll', '.mly', '.php',
-  '.purs', '.rkt', '.vb', '.vbs', '.vba', '.feature', '.s', '.asm', '.sln',
-  '.md', '.markdown', '.yml', '.yaml', '.json', '.xml', '.html', '.css',
-  '.scss', '.less', '.ini', '.conf', '.config', '.toml', '.tex', '.bib',
+  '.hbs', '.idr', '.nim', '.ml', '.mli', '.mll', '.mly', '.purs', '.rkt',
+  '.vb', '.vbs', '.vba', '.feature', '.s', '.asm', '.sln', '.md', '.markdown',
+  '.yml', '.yaml', '.json', '.xml', '.html', '.css', '.scss', '.less', '.ini',
+  '.conf', '.config', '.toml', '.tex', '.bib',
 ];
-
 
 // Function to check if a file is binary or text
 function isBinaryFile(contentBuffer: Buffer): boolean {
@@ -164,16 +183,12 @@ async function loadIgnorePatterns(sourceFolder: string): Promise<Ignore> {
   const ig = ignore();
   const gitignorePath = path.join(sourceFolder, '.gitignore');
   if (existsSync(gitignorePath)) {
-    const gitignoreStream = createReadStream(gitignorePath);
-    const rl = createInterface({
-      input: gitignoreStream,
-      crlfDelay: Infinity,
-    });
-
-    for await (const line of rl) {
-      ig.add(line);
-    }
+    const gitignoreContent = await readFile(gitignorePath, 'utf8');
+    ig.add(gitignoreContent);
   }
+
+  // Add additional ignored files
+  ig.add(additionalIgnoredFiles);
 
   return ig;
 }
@@ -188,12 +203,7 @@ async function getFilesRecursively(
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
-    const relativePath = path.relative(sourceFolder, fullPath);
-
-    // Skip additional ignored files
-    if (additionalIgnoredFiles.includes(entry.name)) {
-      continue;
-    }
+    const relativePath = path.relative(resolvedSourceFolder, fullPath);
 
     // Check against the .gitignore rules
     if (ig.ignores(relativePath)) {
@@ -211,31 +221,20 @@ async function getFilesRecursively(
         }
       }
 
-      // Apply include and exclude patterns
-      let includeFile = true;
-
-      // Check exclude patterns
-      for (const pattern of excludePatterns) {
-        if (minimatch(relativePath, pattern)) {
-          includeFile = false;
-          break;
-        }
+      // Apply exclude patterns
+      if (excludePatterns.some(pattern => minimatch(relativePath, pattern))) {
+        continue;
       }
 
-      // Check include patterns
-      if (includePatterns.length > 0) {
-        includeFile = false;
-        for (const pattern of includePatterns) {
-          if (minimatch(relativePath, pattern)) {
-            includeFile = true;
-            break;
-          }
-        }
+      // Apply include patterns
+      if (
+        includePatterns.length > 0 &&
+        !includePatterns.some(pattern => minimatch(relativePath, pattern))
+      ) {
+        continue;
       }
 
-      if (includeFile) {
-        files.push(fullPath);
-      }
+      files.push(fullPath);
     }
   }
 
@@ -243,19 +242,19 @@ async function getFilesRecursively(
 }
 
 // Function to create the text archive from the source folder
-async function createTextArchive(sourceFolder: string): Promise<void> {
+async function createTextArchive(): Promise<void> {
   try {
-    const ig = await loadIgnorePatterns(sourceFolder); // Load ignore patterns from .gitignore
-    const allFiles = await getFilesRecursively(sourceFolder, ig);
+    const ig = await loadIgnorePatterns(resolvedSourceFolder); // Load ignore patterns from .gitignore
+    const allFiles = await getFilesRecursively(resolvedSourceFolder, ig);
 
-    const outputFileExists = existsSync(outputFile);
+    const outputFileExists = existsSync(resolvedOutputFile);
 
     // Overwrite output file if the flag is set
     if (overwriteOutput && outputFileExists) {
-      await unlink(outputFile);
+      await unlink(resolvedOutputFile);
     } else if (outputFileExists) {
       console.error(
-        `Output file already exists: ${outputFile}. Use the -w flag to overwrite it.`
+        `Output file already exists: ${resolvedOutputFile}. Use the -w flag to overwrite it.`
       );
       return;
     }
@@ -271,7 +270,7 @@ async function createTextArchive(sourceFolder: string): Promise<void> {
 
         // Skip binary files
         if (!isBinaryFile(contentBuffer)) {
-          const relativePath = path.relative(sourceFolder, file);
+          const relativePath = path.relative(resolvedSourceFolder, file);
           let content = contentBuffer.toString('utf8');
 
           // Strip empty lines if the flag is set
@@ -290,8 +289,8 @@ async function createTextArchive(sourceFolder: string): Promise<void> {
     }
 
     // Save the accumulated content to the output file
-    await writeFile(outputFile, archiveBuffer, 'utf8');
-    console.log(`Text archive created successfully: ${outputFile}`);
+    await writeFile(resolvedOutputFile, archiveBuffer, 'utf8');
+    console.log(`Text archive created successfully: ${resolvedOutputFile}`);
   } catch (error) {
     console.error('Error while creating text archive:', error);
   }
@@ -354,5 +353,5 @@ if (checkUpdate) {
   checkForLatestVersion();
 } else {
   // Start the main process
-  createTextArchive(sourceFolder);
+  createTextArchive();
 }

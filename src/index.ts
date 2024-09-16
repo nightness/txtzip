@@ -9,8 +9,8 @@ import { createInterface } from 'readline';
 import ignore, { Ignore } from 'ignore';
 import https from 'https';
 import { minimatch } from 'minimatch';
-
 import { fileURLToPath } from 'url';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -34,15 +34,30 @@ interface Args {
 // Function to parse environment variable arguments into an array
 function parseEnvArgs(envArgs: string | undefined): string[] {
   if (!envArgs) return [];
-  // Use a simple regex to split arguments similar to a shell
   return envArgs.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+}
+
+// Load the `txtzip.json` configuration file if it exists
+function loadConfigFromFile(sourceFolder: string): Partial<Args> {
+  const configFile = path.join(sourceFolder, 'txtzip.json');
+  if (existsSync(configFile)) {
+    try {
+      const configContent = readFileSync(configFile, 'utf8');
+      return JSON.parse(configContent) as Partial<Args>;
+    } catch (error: any) {
+      console.error(`Failed to parse txtzip.json: ${error?.message}`);
+    }
+  }
+  return {};
 }
 
 // Parse environment variable arguments
 const envArgs = parseEnvArgs(process.env.TXTZIP_ARGS);
 
-// Combine environment variable arguments with command-line arguments
-// Command-line arguments take precedence
+// Load defaults from `txtzip.json` if it exists
+const configDefaults = loadConfigFromFile(process.cwd());
+
+// Combine environment variable arguments, config file arguments, and command-line arguments
 const argv = yargs([...envArgs, ...hideBin(process.argv)])
   .usage('Usage: txtzip [options]')
   .wrap(process.stdout.columns || 80) // Set the wrap width to the terminal width
@@ -51,50 +66,49 @@ const argv = yargs([...envArgs, ...hideBin(process.argv)])
       alias: 's',
       type: 'string',
       description: 'Source folder to archive (defaults to current working directory)',
-      default: '.',
+      default: configDefaults.source || '.',
     },
     output: {
       alias: 'o',
       type: 'string',
-      description:
-        'Output file name (defaults to text-archive.txt in the current directory)',
-      default: './text-archive.txt',
+      description: 'Output file name (defaults to text-archive.txt in the current directory)',
+      default: configDefaults.output || './text-archive.txt',
     },
     overwrite: {
       alias: 'w',
       type: 'boolean',
       description: 'Overwrite the output file if it exists',
-      default: false,
+      default: configDefaults.overwrite || false,
     },
     'source-only': {
       alias: 'S',
       type: 'boolean',
       description: 'Only include files with source code related extensions',
-      default: false,
+      default: configDefaults['source-only'] || false,
     },
     'strip-empty-lines': {
       alias: 'e',
       type: 'boolean',
       description: 'Strip empty lines from files',
-      default: false,
+      default: configDefaults['strip-empty-lines'] || false,
     },
     'check-update': {
       alias: 'u',
       type: 'boolean',
       description: 'Check for the latest version available',
-      default: false,
+      default: configDefaults['check-update'] || false,
     },
     include: {
       alias: 'i',
       type: 'array',
       description: 'Include files matching the given glob patterns',
-      default: [],
+      default: configDefaults.include || [],
     },
     exclude: {
       alias: 'x',
       type: 'array',
       description: 'Exclude files matching the given glob patterns',
-      default: [],
+      default: configDefaults.exclude || [],
     },
   })
   .alias('help', 'h')
@@ -128,6 +142,7 @@ const sourceCodeExtensions = [
   '.md', '.markdown', '.yml', '.yaml', '.json', '.xml', '.html', '.css',
   '.scss', '.less', '.ini', '.conf', '.config', '.toml', '.tex', '.bib',
 ];
+
 
 // Function to check if a file is binary or text
 function isBinaryFile(contentBuffer: Buffer): boolean {

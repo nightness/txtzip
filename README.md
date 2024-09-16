@@ -10,8 +10,9 @@
 - **Include or Exclude Files**: Use the `--include` (`-i`) and `--exclude` (`-x`) options to include or exclude files based on glob patterns.
 - **Outputs a clean, readable text archive** with delineations showing file paths.
 - **Overwrite Output File**: Use the `--overwrite` (`-w`) flag to overwrite the output file if it exists.
-- **Include Only Source Code Files**: Use the `--source-only` (`-S`) flag to include only files with source code related extensions.
+- **Include Only Source Code Files**: Use the `--source-only` (`-S`) flag to include only files with source code-related extensions.
 - **Strip Empty Lines**: Use the `--strip-empty-lines` (`-e`) flag to remove empty lines from files.
+- **Support for Configuration File**: Specify default options in a `txtzip.json` file located in the source folder.
 - **Environment Variable Support**: Set default command-line arguments using the `TXTZIP_ARGS` environment variable.
 - **Check for Updates**: Use the `--check-update` (`-u`) flag to check if a newer version is available.
 - **Version Command**: Use the `--version` (`-v`) flag to display the current version.
@@ -47,7 +48,7 @@ txtzip --source ./your-folder --output ./your-output.txt
 - **`--source`** (`-s`): The source folder to archive. Defaults to the current working directory.
 - **`--output`** (`-o`): The output file name for the text archive. Defaults to `text-archive.txt` in the current directory.
 - **`--overwrite`** (`-w`): Overwrite the output file if it exists.
-- **`--source-only`** (`-S`): Only include files with source code related extensions.
+- **`--source-only`** (`-S`): Only include files with source code-related extensions.
 - **`--strip-empty-lines`** (`-e`): Strip empty lines from files.
 - **`--include`** (`-i`): Include files matching the given glob patterns. Can be specified multiple times.
 - **`--exclude`** (`-x`): Exclude files matching the given glob patterns. Can be specified multiple times.
@@ -55,7 +56,32 @@ txtzip --source ./your-folder --output ./your-output.txt
 - **`--help`** (`-h`): Show help information about the command-line options.
 - **`--version`** (`-v`): Show the current version.
 
-### Environment Variable:
+### Configuration File: `txtzip.json`
+
+You can define default options in a `txtzip.json` file located in the source folder. This allows you to configure `txtzip` without having to pass all options via the command line.
+
+Example `txtzip.json`:
+
+```json
+{
+  "source": "./src",
+  "output": "./archive.txt",
+  "overwrite": true,
+  "source-only": true,
+  "strip-empty-lines": true,
+  "include": ["*.ts", "*.js"],
+  "exclude": ["node_modules/**", "*.test.js"]
+}
+```
+
+### How `txtzip.json` Works:
+
+- `txtzip` will look for `txtzip.json` in the source folder.
+- Options specified in `txtzip.json` will be used as **default values** for command-line options.
+- **Command-line arguments override** the values in `txtzip.json`.
+- If `txtzip.json` is not found, the tool will use its built-in defaults.
+
+### Environment Variable: `TXTZIP_ARGS`
 
 You can set default command-line arguments using the `TXTZIP_ARGS` environment variable.
 

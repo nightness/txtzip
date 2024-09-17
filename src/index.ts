@@ -15,7 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const additionalIgnoredFiles = [
-  '.DS_Store', 'Thumbs.db', 'desktop.ini',
+  '.DS_Store', 'Thumbs.db', 'desktop.ini', 'txtzip.json', 'txtzip.txt',
   '.vscode', '.idea', '.git', '.gitignore', 'node_modules', 'package-lock.json', 'yarn.lock'
 ];
 
@@ -87,8 +87,8 @@ const argv = yargs([...envArgs, ...hideBin(process.argv)])
     output: {
       alias: 'o',
       type: 'string',
-      description: 'Output file name (defaults to text-archive.txt in the current directory)',
-      default: configDefaults.output || './text-archive.txt',
+      description: 'Output file name (defaults to txtzip.txt in the current directory)',
+      default: configDefaults.output || './txtzip.txt',
     },
     overwrite: {
       alias: 'w',

@@ -10,6 +10,7 @@
 - **Include or Exclude Files**: Use the `--include` (`-i`) and `--exclude` (`-x`) options to include or exclude files based on glob patterns.
 - **Outputs a clean, readable text archive** with delineations showing file paths.
 - **Overwrite Output File**: Use the `--overwrite` (`-w`) flag to overwrite the output file if it exists.
+- **Chunk Large Output Files**: Use the `--chunk-size` (`-c`) option to split the output into multiple files when it exceeds the specified size.
 - **Include Only Source Code Files**: Use the `--source-only` (`-S`) flag to include only files with source code-related extensions.
 - **Strip Empty Lines**: Use the `--strip-empty-lines` (`-e`) flag to remove empty lines from files.
 - **Support for Configuration File**: Specify default options in a `txtzip.json` file located in the source folder.
@@ -69,7 +70,7 @@ Example `txtzip.json`:
   "overwrite": true,
   "source-only": true,
   "strip-empty-lines": true,
-  "include": ["*.ts", "*.js"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules/**", "*.test.js"]
 }
 ```

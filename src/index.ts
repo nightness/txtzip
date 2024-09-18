@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
 import { readdir, stat, readFile, writeFile, unlink } from 'fs/promises';
-import { existsSync, readFileSync, createReadStream } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { createInterface } from 'readline';
 import ignore, { Ignore } from 'ignore';
 import https from 'https';
 import { minimatch } from 'minimatch';
@@ -29,6 +28,7 @@ interface Args {
   'check-update': boolean;
   include: string[];
   exclude: string[];
+  chunkSize: string;
 }
 
 // Function to parse environment variable arguments into an array
@@ -126,6 +126,12 @@ const argv = yargs([...envArgs, ...hideBin(process.argv)])
       description: 'Exclude files matching the given glob patterns',
       default: configDefaults.exclude || [],
     },
+    chunkSize: {
+      alias: 'c',
+      type: 'string',
+      description: 'Maximum size of each output file (e.g., 1M, 512k)',
+      default: configDefaults.chunkSize || '',
+    },
   })
   .alias('help', 'h')
   .alias('version', 'v')
@@ -144,6 +150,7 @@ const {
   'check-update': checkUpdate,
   include: includePatterns,
   exclude: excludePatterns,
+  chunkSize: chunkSizeStr,
 } = argv;
 
 // Resolve paths to absolute paths
@@ -241,25 +248,64 @@ async function getFilesRecursively(
   return files;
 }
 
+// Function to parse size strings (e.g., '1M', '512k') into bytes
+function parseSize(sizeStr: string): number {
+  const units: { [key: string]: number } = {
+    '': 1,
+    'b': 1,
+    'k': 1024,
+    'kb': 1024,
+    'm': 1024 * 1024,
+    'mb': 1024 * 1024,
+    'g': 1024 * 1024 * 1024,
+    'gb': 1024 * 1024 * 1024,
+  };
+
+  const match = sizeStr.trim().toLowerCase().match(/^(\d+)([bkmg]b?)?$/);
+  if (!match) {
+    throw new Error(`Invalid size format: ${sizeStr}`);
+  }
+  const num = parseInt(match[1], 10);
+  const unit = match[2] || '';
+  const multiplier = units[unit];
+  if (multiplier === undefined) {
+    throw new Error(`Invalid size unit in size: ${sizeStr}`);
+  }
+  return num * multiplier;
+}
+
+let maxChunkSize = 0;
+
+if (chunkSizeStr) {
+  try {
+    maxChunkSize = parseSize(chunkSizeStr);
+  } catch (error: any) {
+    console.error(error.message);
+    process.exit(1);
+  }
+}
+
+// Function to get the output file path based on index
+function getOutputFilePath(index: number): string {
+  const ext = path.extname(resolvedOutputFile);
+  const baseName = path.basename(resolvedOutputFile, ext);
+  const dirName = path.dirname(resolvedOutputFile);
+  const indexStr = index.toString().padStart(2, '0');
+  return path.join(dirName, `${baseName}.${indexStr}${ext}`);
+}
+
 // Function to create the text archive from the source folder
 async function createTextArchive(): Promise<void> {
   try {
     const ig = await loadIgnorePatterns(resolvedSourceFolder); // Load ignore patterns from .gitignore
     const allFiles = await getFilesRecursively(resolvedSourceFolder, ig);
 
-    const outputFileExists = existsSync(resolvedOutputFile);
-
-    // Overwrite output file if the flag is set
-    if (overwriteOutput && outputFileExists) {
-      await unlink(resolvedOutputFile);
-    } else if (outputFileExists) {
-      console.error(
-        `Output file already exists: ${resolvedOutputFile}. Use the -w flag to overwrite it.`
-      );
-      return;
-    }
-
-    let archiveBuffer = ''; // Memory buffer for storing file contents
+    // Prepare to collect the content
+    let outputFilesContent: string[] = [''];
+    let currentChunkSize = 0;
+    let currentFileIndex = 0;
+    let isContinuingFile = false;
+    let currentFileName = '';
 
     for (const file of allFiles) {
       const fileStats = await stat(file);
@@ -281,16 +327,79 @@ async function createTextArchive(): Promise<void> {
               .join('\n');
           }
 
-          archiveBuffer += `\n=== Start of File: ${relativePath} ===\n`;
-          archiveBuffer += content;
-          archiveBuffer += `\n=== End of File: ${relativePath} ===\n`;
+          let fileHeader = `\n=== Start of File: ${relativePath} ===\n`;
+          let fileFooter = `\n=== End of File: ${relativePath} ===\n`;
+          let fileContent = content;
+
+          let totalFileContent = fileHeader + fileContent + fileFooter;
+          let totalFileContentSize = Buffer.byteLength(totalFileContent, 'utf8');
+
+          let contentPointer = 0;
+
+          while (contentPointer < totalFileContent.length) {
+            let remainingChunkSpace = maxChunkSize > 0 ? maxChunkSize - currentChunkSize : Infinity;
+            let remainingContentLength = totalFileContent.length - contentPointer;
+            let sliceLength = Math.min(remainingChunkSpace, remainingContentLength);
+
+            // Ensure we don't cut in the middle of a multi-byte character
+            let contentSlice = totalFileContent.substr(contentPointer, sliceLength);
+
+            if (maxChunkSize > 0 && currentChunkSize + Buffer.byteLength(contentSlice, 'utf8') > maxChunkSize) {
+              // Adjust slice to fit into the chunk
+              while (Buffer.byteLength(contentSlice, 'utf8') > remainingChunkSpace) {
+                sliceLength--;
+                contentSlice = totalFileContent.substr(contentPointer, sliceLength);
+              }
+            }
+
+            // Update content pointer
+            contentPointer += sliceLength;
+
+            // Add continuation headers and footers if necessary
+            if (isContinuingFile) {
+              // We're continuing a file from the previous chunk
+              contentSlice = `\n=== Continuation of File: ${currentFileName} ===\n` + contentSlice;
+              isContinuingFile = false;
+            }
+
+            // Check if we have reached the end of the file in this chunk
+            if (contentPointer < totalFileContent.length) {
+              // Not at the end, so we need to add a continuation footer
+              contentSlice += `\n=== File continues in next part ===\n`;
+              isContinuingFile = true;
+              currentFileName = relativePath;
+            }
+
+            // Add content to the current chunk
+            outputFilesContent[currentFileIndex] += contentSlice;
+            currentChunkSize += Buffer.byteLength(contentSlice, 'utf8');
+
+            // If we've reached the max chunk size, start a new chunk
+            if (maxChunkSize > 0 && currentChunkSize >= maxChunkSize) {
+              currentFileIndex++;
+              outputFilesContent.push('');
+              currentChunkSize = 0;
+            }
+          }
         }
       }
     }
 
-    // Save the accumulated content to the output file
-    await writeFile(resolvedOutputFile, archiveBuffer, 'utf8');
-    console.log(`Text archive created successfully: ${resolvedOutputFile}`);
+    // Write output files
+    for (let i = 0; i < outputFilesContent.length; i++) {
+      const outputFilePath = outputFilesContent.length > 1 ? getOutputFilePath(i + 1) : resolvedOutputFile;
+
+      if (!overwriteOutput && existsSync(outputFilePath)) {
+        console.error(
+          `Output file already exists: ${outputFilePath}. Use the -w flag to overwrite it.`
+        );
+        return;
+      }
+
+      await writeFile(outputFilePath, outputFilesContent[i], 'utf8');
+    }
+
+    console.log(`Text archive created successfully with ${outputFilesContent.length} file(s).`);
   } catch (error) {
     console.error('Error while creating text archive:', error);
   }

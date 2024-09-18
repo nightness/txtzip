@@ -8,6 +8,8 @@
 - **Respects `.gitignore` rules** to exclude ignored files and folders.
 - **Automatically skips the `.git` folder** to prevent including Git metadata.
 - **Include or Exclude Files**: Use the `--include` (`-i`) and `--exclude` (`-x`) options to include or exclude files based on glob patterns.
+  - **Recursive Matching**: Patterns without a path separator (e.g., `*.ts`) will match files recursively in all subdirectories.
+  - **Specific Matching**: Patterns with a path separator (e.g., `src/**/*.tsx`) will match files according to the specified path.
 - **Outputs a clean, readable text archive** with delineations showing file paths.
 - **Overwrite Output File**: Use the `--overwrite` (`-w`) flag to overwrite the output file if it exists.
 - **Chunk Large Output Files**: Use the `--chunk-size` (`-c`) option to split the output into multiple files when it exceeds the specified size.
@@ -49,9 +51,12 @@ txtzip --source ./your-folder --output ./your-output.txt
 - **`--source`** (`-s`): The source folder to archive. Defaults to the current working directory.
 - **`--output`** (`-o`): The output file name for the text archive. Defaults to `text-archive.txt` in the current directory.
 - **`--overwrite`** (`-w`): Overwrite the output file if it exists.
+- **`--chunk-size`** (`-c`): Maximum size of each output file (e.g., `1M`, `512k`). If specified, the output will be split into multiple files not exceeding this size.
 - **`--source-only`** (`-S`): Only include files with source code-related extensions.
 - **`--strip-empty-lines`** (`-e`): Strip empty lines from files.
 - **`--include`** (`-i`): Include files matching the given glob patterns. Can be specified multiple times.
+  - **Recursive Matching**: Patterns without a path separator (e.g., `*.ts`) will match files recursively in all subdirectories.
+  - **Specific Matching**: Patterns with a path separator (e.g., `src/**/*.tsx`) will match files according to the specified path.
 - **`--exclude`** (`-x`): Exclude files matching the given glob patterns. Can be specified multiple times.
 - **`--check-update`** (`-u`): Check for the latest version available.
 - **`--help`** (`-h`): Show help information about the command-line options.
@@ -68,9 +73,10 @@ Example `txtzip.json`:
   "source": "./src",
   "output": "./archive.txt",
   "overwrite": true,
+  "chunkSize": "10k",
   "source-only": true,
   "strip-empty-lines": true,
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": ["*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules/**", "*.test.js"]
 }
 ```
@@ -92,42 +98,60 @@ You can set default command-line arguments using the `TXTZIP_ARGS` environment v
 - Arguments specified in `TXTZIP_ARGS` are parsed and used as defaults.
 - **Note**: Command-line arguments provided when running the program will override these defaults.
 
-**Examples:**
+## **Examples**
 
-- **Set `TXTZIP_ARGS` to include `-w`, `-S`, and `-e` flags:**
+### **Include Patterns with Recursive and Specific Matching**
 
-  ```bash
-  export TXTZIP_ARGS="-wSe"
-
-  npx txtzip --source ./src --output ./output.txt
-  ```
-
-- **Override an argument from `TXTZIP_ARGS`:**
+- **Include all `.ts` files recursively**:
 
   ```bash
-  export TXTZIP_ARGS="-wSe"
-
-  # Override the overwrite flag to false
-  npx txtzip --source ./src --output ./output.txt --no-overwrite
+  txtzip -i "*.ts" --source ./src --output ./output.txt
   ```
 
-### Examples
-
-#### **Include and Exclude Patterns**
-
-- **Include only `.ts` and `.js` files:**
+- **Include only `.tsx` files in the `src` directory and its subdirectories**:
 
   ```bash
-  txtzip -i "*.ts" -i "*.js" --source ./src --output ./output.txt
+  txtzip -i "src/**/*.tsx" --source ./ --output ./output.txt
   ```
 
-- **Exclude test files and node_modules:**
+- **Include all `.js` files in the current directory only (non-recursive)**:
 
   ```bash
-  txtzip -x "*.test.js" -x "node_modules/**" --source ./src --output ./output.txt
+  txtzip -i "./*.js" --source ./ --output ./output.txt
   ```
 
-#### **Check for Updates**
+### **Set `TXTZIP_ARGS` to include `-w`, `-S`, and `-e` flags:**
+
+```bash
+export TXTZIP_ARGS="-wSe"
+
+npx txtzip --source ./src --output ./output.txt
+```
+
+### **Override an argument from `TXTZIP_ARGS`:**
+
+```bash
+export TXTZIP_ARGS="-wSe"
+
+# Override the overwrite flag to false
+npx txtzip --source ./src --output ./output.txt --no-overwrite
+```
+
+### **Exclude test files and node_modules:**
+
+```bash
+txtzip -x "*.test.js" -x "node_modules/**" --source ./src --output ./output.txt
+```
+
+### **Chunk Large Output Files**
+
+Split the output into multiple files, each not exceeding 1MB:
+
+```bash
+txtzip --source ./src --output ./output.txt --chunk-size 1M
+```
+
+### **Check for Updates**
 
 Check if a newer version of `txtzip` is available:
 
@@ -135,7 +159,7 @@ Check if a newer version of `txtzip` is available:
 npx txtzip --check-update
 ```
 
-#### **Show Version**
+### **Show Version**
 
 Display the current version:
 
@@ -143,7 +167,7 @@ Display the current version:
 npx txtzip --version
 ```
 
-#### **Overwrite Output File**
+### **Overwrite Output File**
 
 Overwrite the output file if it already exists:
 
@@ -151,7 +175,7 @@ Overwrite the output file if it already exists:
 npx txtzip --source ./src --output ./output.txt --overwrite
 ```
 
-#### **Only Include Source Code Files**
+### **Only Include Source Code Files**
 
 Include only files with common source code extensions:
 
@@ -159,7 +183,7 @@ Include only files with common source code extensions:
 npx txtzip --source ./src --output ./output.txt --source-only
 ```
 
-#### **Strip Empty Lines**
+### **Strip Empty Lines**
 
 Remove empty lines from files before adding them to the archive:
 
@@ -167,7 +191,7 @@ Remove empty lines from files before adding them to the archive:
 npx txtzip --source ./src --output ./output.txt --strip-empty-lines
 ```
 
-#### **Combining Flags**
+### **Combining Flags**
 
 You can combine multiple flags and environment variables to customize the output:
 

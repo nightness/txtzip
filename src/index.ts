@@ -200,6 +200,11 @@ async function loadIgnorePatterns(sourceFolder: string): Promise<Ignore> {
   return ig;
 }
 
+// Function to determine if a pattern is recursive
+function isPatternRecursive(pattern: string): boolean {
+  return !pattern.includes('/') && !pattern.includes('\\');
+}
+
 // Recursive function to traverse directories and return a list of files
 async function getFilesRecursively(
   dir: string,
@@ -228,20 +233,30 @@ async function getFilesRecursively(
         }
       }
 
-      // Apply exclude patterns
-      if (excludePatterns.some(pattern => minimatch(relativePath, pattern))) {
-        continue;
-      }
+      let includeMatch = includePatterns.length === 0;
+      let excludeMatch = false;
 
       // Apply include patterns
-      if (
-        includePatterns.length > 0 &&
-        !includePatterns.some(pattern => minimatch(relativePath, pattern))
-      ) {
-        continue;
+      for (const pattern of includePatterns) {
+        const isRecursive = isPatternRecursive(pattern);
+        const matchPath = isRecursive ? relativePath : path.relative(resolvedSourceFolder, fullPath);
+        if (minimatch(matchPath, pattern, { matchBase: isRecursive })) {
+          includeMatch = true;
+          break;
+        }
       }
 
-      files.push(fullPath);
+      // Apply exclude patterns
+      for (const pattern of excludePatterns) {
+        if (minimatch(relativePath, pattern)) {
+          excludeMatch = true;
+          break;
+        }
+      }
+
+      if (includeMatch && !excludeMatch) {
+        files.push(fullPath);
+      }
     }
   }
 
@@ -346,7 +361,7 @@ async function createTextArchive(): Promise<void> {
 
             if (maxChunkSize > 0 && currentChunkSize + Buffer.byteLength(contentSlice, 'utf8') > maxChunkSize) {
               // Adjust slice to fit into the chunk
-              while (Buffer.byteLength(contentSlice, 'utf8') > remainingChunkSpace) {
+              while (Buffer.byteLength(contentSlice, 'utf8') > remainingChunkSpace && sliceLength > 0) {
                 sliceLength--;
                 contentSlice = totalFileContent.substr(contentPointer, sliceLength);
               }

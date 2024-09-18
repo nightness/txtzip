@@ -1,7 +1,0 @@
-{
-    "source": "./src",
-    "overwrite": true,
-    "chunkSize": "10000",
-    "source-only": true,
-    "strip-empty-lines": true
-}

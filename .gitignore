@@ -1,3 +1,6 @@
+txtzip.json
+*.zip
+
 dist/
 node_modules
 

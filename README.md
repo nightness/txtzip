@@ -1,16 +1,18 @@
 # **txtzip**
 
-`txtzip` is a simple command-line tool for developers that bundles all the text files in a project folder into a single text file. It respects `.gitignore` and automatically ignores the `.git` folder, making it easy to bundle up your source code for sharing with ChatGPT or other LLMs.
+`txtzip` is a simple command-line tool for developers that bundles all the text files in a project folder into a single **Markdown** file. It respects `.gitignore` and automatically ignores the `.git` folder, making it easy to bundle up your source code for sharing with ChatGPT or other LLMs.
 
 ## Features
 
-- **Collects all text files** from a folder into a single archive.
+- **Collects all text files** from a folder into a single **Markdown** archive.
 - **Respects `.gitignore` rules** to exclude ignored files and folders.
 - **Automatically skips the `.git` folder** to prevent including Git metadata.
 - **Include or Exclude Files**: Use the `--include` (`-i`) and `--exclude` (`-x`) options to include or exclude files based on glob patterns.
   - **Recursive Matching**: Patterns without a path separator (e.g., `*.ts`) will match files recursively in all subdirectories.
   - **Specific Matching**: Patterns with a path separator (e.g., `src/**/*.tsx`) will match files according to the specified path.
-- **Outputs a clean, readable text archive** with delineations showing file paths.
+- **Outputs a clean, readable Markdown archive** with code blocks and formatted file paths.
+- **Proper Handling of Markdown Files**: When including Markdown files (e.g., `README.md`), their content is included as-is without wrapping all of it in a code block.
+- **Prefix Tree Structure**: Use the `--prefix-tree` (`-p`) flag to include a tree-like structure of the included files at the beginning of the output.
 - **Overwrite Output File**: Use the `--overwrite` (`-w`) flag to overwrite the output file if it exists.
 - **Chunk Large Output Files**: Use the `--chunk-size` (`-c`) option to split the output into multiple files when it exceeds the specified size.
 - **Include Only Source Code Files**: Use the `--source-only` (`-S`) flag to include only files with source code-related extensions.
@@ -29,7 +31,7 @@ You can use `txtzip` directly with `npx` or install it globally:
 ### Using `npx` (no installation required)
 
 ```bash
-npx txtzip --source ./your-folder --output ./your-output.txt
+npx txtzip --source ./your-folder --output ./your-output.md
 ```
 
 ### Install globally
@@ -41,7 +43,7 @@ npm install -g txtzip
 Then run:
 
 ```bash
-txtzip --source ./your-folder --output ./your-output.txt
+txtzip --source ./your-folder --output ./your-output.md
 ```
 
 ## Usage
@@ -49,7 +51,7 @@ txtzip --source ./your-folder --output ./your-output.txt
 ### Command-line options:
 
 - **`--source`** (`-s`): The source folder to archive. Defaults to the current working directory.
-- **`--output`** (`-o`): The output file name for the text archive. Defaults to `text-archive.txt` in the current directory.
+- **`--output`** (`-o`): The output file name for the Markdown archive. Defaults to `txtzip.md` in the current directory.
 - **`--overwrite`** (`-w`): Overwrite the output file if it exists.
 - **`--chunk-size`** (`-c`): Maximum size of each output file (e.g., `1M`, `512k`). If specified, the output will be split into multiple files not exceeding this size.
 - **`--source-only`** (`-S`): Only include files with source code-related extensions.
@@ -58,6 +60,7 @@ txtzip --source ./your-folder --output ./your-output.txt
   - **Recursive Matching**: Patterns without a path separator (e.g., `*.ts`) will match files recursively in all subdirectories.
   - **Specific Matching**: Patterns with a path separator (e.g., `src/**/*.tsx`) will match files according to the specified path.
 - **`--exclude`** (`-x`): Exclude files matching the given glob patterns. Can be specified multiple times.
+- **`--prefix-tree`** (`-p`): Include a tree-like structure of the included files at the beginning of the output.
 - **`--check-update`** (`-u`): Check for the latest version available.
 - **`--help`** (`-h`): Show help information about the command-line options.
 - **`--version`** (`-v`): Show the current version.
@@ -71,11 +74,12 @@ Example `txtzip.json`:
 ```json
 {
   "source": "./src",
-  "output": "./archive.txt",
+  "output": "./archive.md",
   "overwrite": true,
   "chunkSize": "10k",
   "source-only": true,
   "strip-empty-lines": true,
+  "prefix-tree": true,
   "include": ["*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules/**", "*.test.js"]
 }
@@ -100,24 +104,61 @@ You can set default command-line arguments using the `TXTZIP_ARGS` environment v
 
 ## **Examples**
 
+### **Include a Tree Structure of Included Files**
+
+Include a tree-like structure of the included files at the beginning of the output:
+
+```bash
+txtzip --source ./src --output ./output.md --prefix-tree
+```
+
+Example output at the beginning of `output.md`:
+
+```plaintext
+app/
+├── page.tsx
+├── layout.tsx
+├── globals.css
+└── theme/
+    └── theme.ts
+
+src/
+├── app.controller.ts
+├── app.module.ts
+└── main.ts
+
+docker-compose.yml
+docker-compose.dev.yml
+start-hybrid.js
+jest.config.json
+next.config.js
+package.json
+tsconfig.json
+tsconfig.server.json
+```
+
+### **Handling Markdown Files**
+
+When `txtzip` encounters Markdown files like `README.md`, it includes their content directly without wrapping it in code blocks. This ensures that the Markdown formatting is preserved in the output.
+
 ### **Include Patterns with Recursive and Specific Matching**
 
 - **Include all `.ts` files recursively**:
 
   ```bash
-  txtzip -i "*.ts" --source ./src --output ./output.txt
+  txtzip -i "*.ts" --source ./src --output ./output.md
   ```
 
 - **Include only `.tsx` files in the `src` directory and its subdirectories**:
 
   ```bash
-  txtzip -i "src/**/*.tsx" --source ./ --output ./output.txt
+  txtzip -i "src/**/*.tsx" --source ./ --output ./output.md
   ```
 
 - **Include all `.js` files in the current directory only (non-recursive)**:
 
   ```bash
-  txtzip -i "./*.js" --source ./ --output ./output.txt
+  txtzip -i "./*.js" --source ./ --output ./output.md
   ```
 
 ### **Set `TXTZIP_ARGS` to include `-w`, `-S`, and `-e` flags:**
@@ -125,7 +166,7 @@ You can set default command-line arguments using the `TXTZIP_ARGS` environment v
 ```bash
 export TXTZIP_ARGS="-wSe"
 
-npx txtzip --source ./src --output ./output.txt
+npx txtzip --source ./src --output ./output.md
 ```
 
 ### **Override an argument from `TXTZIP_ARGS`:**
@@ -134,13 +175,13 @@ npx txtzip --source ./src --output ./output.txt
 export TXTZIP_ARGS="-wSe"
 
 # Override the overwrite flag to false
-npx txtzip --source ./src --output ./output.txt --no-overwrite
+npx txtzip --source ./src --output ./output.md --no-overwrite
 ```
 
 ### **Exclude test files and node_modules:**
 
 ```bash
-txtzip -x "*.test.js" -x "node_modules/**" --source ./src --output ./output.txt
+txtzip -x "*.test.js" -x "node_modules/**" --source ./src --output ./output.md
 ```
 
 ### **Chunk Large Output Files**
@@ -148,7 +189,7 @@ txtzip -x "*.test.js" -x "node_modules/**" --source ./src --output ./output.txt
 Split the output into multiple files, each not exceeding 1MB:
 
 ```bash
-txtzip --source ./src --output ./output.txt --chunk-size 1M
+txtzip --source ./src --output ./output.md --chunk-size 1M
 ```
 
 ### **Check for Updates**
@@ -172,7 +213,7 @@ npx txtzip --version
 Overwrite the output file if it already exists:
 
 ```bash
-npx txtzip --source ./src --output ./output.txt --overwrite
+npx txtzip --source ./src --output ./output.md --overwrite
 ```
 
 ### **Only Include Source Code Files**
@@ -180,7 +221,7 @@ npx txtzip --source ./src --output ./output.txt --overwrite
 Include only files with common source code extensions:
 
 ```bash
-npx txtzip --source ./src --output ./output.txt --source-only
+npx txtzip --source ./src --output ./output.md --source-only
 ```
 
 ### **Strip Empty Lines**
@@ -188,7 +229,9 @@ npx txtzip --source ./src --output ./output.txt --source-only
 Remove empty lines from files before adding them to the archive:
 
 ```bash
-npx txtzip --source ./src --output ./output.txt --strip-empty-lines
+n
+
+px txtzip --source ./src --output ./output.md --strip-empty-lines
 ```
 
 ### **Combining Flags**
@@ -198,7 +241,7 @@ You can combine multiple flags and environment variables to customize the output
 ```bash
 export TXTZIP_ARGS="-wS"
 
-npx txtzip --source ./src --output ./output.txt --strip-empty-lines
+npx txtzip --source ./src --output ./output.md --strip-empty-lines --prefix-tree
 ```
 
 ### Getting Help
@@ -219,23 +262,43 @@ This will display information about all available options, along with usage exam
 
 ### Example Output
 
+```plaintext
+app/
+├── page.tsx
+├── layout.tsx
+├── globals.css
+└── theme/
+    └── theme.ts
+
+src/
+├── app.controller.ts
+├── app.module.ts
+└── main.ts
+
+docker-compose.yml
+docker-compose.dev.yml
+start-hybrid.js
+jest.config.json
+next.config.js
+package.json
+tsconfig.json
+tsconfig.server.json
 ```
-=== Start of File: src/index.ts ===
+
+## File: src/index.ts
+
+```typescript
 #!/usr/bin/env node
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
 // ... rest of the file contents
-
-=== End of File: src/index.ts ===
-
-=== Start of File: src/utils/helper.ts ===
-export function helper() {
-  // helper function code
-}
-// ... rest of the file contents
-
-=== End of File: src/utils/helper.ts ===
 ```
+
+## File: README.md
+
+This is the content of the `README.md` file included as-is, without being wrapped in a code block.
+
+---
 
 ## Development
 
@@ -257,7 +320,7 @@ npm run build
 
 ```bash
 npm link
-txtzip --source ./src --output ./output.txt
+txtzip --source ./src --output ./output.md
 ```
 
 ## Contributing

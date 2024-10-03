@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readdir, stat, readFile, writeFile, unlink } from 'fs/promises';
+import { readdir, stat, readFile, writeFile } from 'fs/promises';
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import yargs from 'yargs';
@@ -29,6 +29,7 @@ interface Args {
   include: string[];
   exclude: string[];
   chunkSize: string;
+  'prefix-tree': boolean;
 }
 
 // Function to parse environment variable arguments into an array
@@ -87,8 +88,8 @@ const argv = yargs([...envArgs, ...hideBin(process.argv)])
     output: {
       alias: 'o',
       type: 'string',
-      description: 'Output file name (defaults to txtzip.txt in the current directory)',
-      default: configDefaults.output || './txtzip.txt',
+      description: 'Output file name (defaults to txtzip.md in the current directory)',
+      default: configDefaults.output || './txtzip.md',
     },
     overwrite: {
       alias: 'w',
@@ -132,6 +133,12 @@ const argv = yargs([...envArgs, ...hideBin(process.argv)])
       description: 'Maximum size of each output file (e.g., 1M, 512k)',
       default: configDefaults.chunkSize || '',
     },
+    'prefix-tree': {
+      alias: 'p',
+      type: 'boolean',
+      description: 'Prefix the output with a tree-like structure of included files',
+      default: configDefaults['prefix-tree'] || false,
+    },
   })
   .alias('help', 'h')
   .alias('version', 'v')
@@ -151,6 +158,7 @@ const {
   include: includePatterns,
   exclude: excludePatterns,
   chunkSize: chunkSizeStr,
+  'prefix-tree': prefixTree,
 } = argv;
 
 // Resolve paths to absolute paths
@@ -309,6 +317,154 @@ function getOutputFilePath(index: number): string {
   return path.join(dirName, `${baseName}.${indexStr}${ext}`);
 }
 
+// Tree node interface
+interface TreeNode {
+  name: string;
+  children: TreeNode[];
+  isFile: boolean;
+}
+
+// Function to build the tree structure from file paths
+function buildTree(paths: string[]): TreeNode {
+  const root: TreeNode = { name: '', children: [], isFile: false };
+
+  for (const relPath of paths) {
+    const parts = relPath.split(path.sep);
+    let currentNode = root;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      let childNode = currentNode.children.find(child => child.name === part);
+      if (!childNode) {
+        childNode = {
+          name: part,
+          children: [],
+          isFile: i === parts.length - 1, // If last part, it's a file
+        };
+        currentNode.children.push(childNode);
+      }
+      currentNode = childNode;
+    }
+  }
+  return root;
+}
+
+// Function to render the tree into a string
+function renderTree(
+  node: TreeNode,
+  prefix: string = '',
+  isLast: boolean = true,
+  isRoot: boolean = true
+): string[] {
+  const lines: string[] = [];
+  const connector = isRoot ? '' : (isLast ? '└── ' : '├── ');
+  if (node.name) {
+    lines.push(prefix + connector + node.name + (node.isFile ? '' : path.sep));
+  }
+
+  const newPrefix = prefix + (isRoot ? '' : (isLast ? '    ' : '│   '));
+
+  node.children.sort((a, b) => {
+    // Directories first
+    if (!a.isFile && b.isFile) return -1;
+    if (a.isFile && !b.isFile) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  node.children.forEach((child, index) => {
+    const isLastChild = index === node.children.length - 1;
+    const childLines = renderTree(child, newPrefix, isLastChild, false);
+    lines.push(...childLines);
+  });
+
+  return lines;
+}
+
+// Function to get language identifier from file extension
+function getLanguageFromExtension(ext: string): string {
+  const extensionMap: { [key: string]: string } = {
+    '.js': 'javascript',
+    '.ts': 'typescript',
+    '.jsx': 'jsx',
+    '.tsx': 'tsx',
+    '.py': 'python',
+    '.java': 'java',
+    '.c': 'c',
+    '.cpp': 'cpp',
+    '.h': 'cpp',
+    '.hpp': 'cpp',
+    '.cs': 'csharp',
+    '.go': 'go',
+    '.rb': 'ruby',
+    '.php': 'php',
+    '.swift': 'swift',
+    '.kt': 'kotlin',
+    '.kts': 'kotlin',
+    '.rs': 'rust',
+    '.sh': 'bash',
+    '.bat': 'bat',
+    '.ps1': 'powershell',
+    '.pl': 'perl',
+    '.lua': 'lua',
+    '.sql': 'sql',
+    '.scala': 'scala',
+    '.groovy': 'groovy',
+    '.hs': 'haskell',
+    '.erl': 'erlang',
+    '.ex': 'elixir',
+    '.exs': 'elixir',
+    '.r': 'r',
+    '.jl': 'julia',
+    '.f90': 'fortran',
+    '.f95': 'fortran',
+    '.f03': 'fortran',
+    '.clj': 'clojure',
+    '.cljc': 'clojure',
+    '.cljs': 'clojure',
+    '.coffee': 'coffeescript',
+    '.dart': 'dart',
+    '.elm': 'elm',
+    '.fs': 'fsharp',
+    '.fsi': 'fsharp',
+    '.fsx': 'fsharp',
+    '.gd': 'gdscript',
+    '.hbs': 'handlebars',
+    '.idr': 'idris',
+    '.nim': 'nim',
+    '.ml': 'ocaml',
+    '.mli': 'ocaml',
+    '.mll': 'ocaml',
+    '.mly': 'ocaml',
+    '.purs': 'purescript',
+    '.rkt': 'racket',
+    '.vb': 'vb.net',
+    '.vbs': 'vbscript',
+    '.vba': 'vba',
+    '.feature': 'gherkin',
+    '.s': 'assembly',
+    '.asm': 'assembly',
+    '.sln': 'xml',
+    '.md': 'markdown',
+    '.markdown': 'markdown',
+    '.yml': 'yaml',
+    '.yaml': 'yaml',
+    '.json': 'json',
+    '.xml': 'xml',
+    '.html': 'html',
+    '.css': 'css',
+    '.scss': 'scss',
+    '.less': 'less',
+    '.ini': 'ini',
+    '.conf': '',
+    '.config': '',
+    '.toml': 'toml',
+    '.tex': 'latex',
+    '.bib': 'bibtex',
+    '.txt': '',
+  };
+  return extensionMap[ext.toLowerCase()] || '';
+}
+
 // Function to create the text archive from the source folder
 async function createTextArchive(): Promise<void> {
   try {
@@ -321,6 +477,36 @@ async function createTextArchive(): Promise<void> {
     let currentFileIndex = 0;
     let isContinuingFile = false;
     let currentFileName = '';
+
+    // Generate tree structure if prefixTree is true
+    if (prefixTree) {
+      const relativePaths = allFiles.map(file => path.relative(resolvedSourceFolder, file));
+      const tree = buildTree(relativePaths);
+
+      // Sort the root-level children for consistent ordering
+      tree.children.sort((a, b) => {
+        // Directories first
+        if (!a.isFile && b.isFile) return -1;
+        if (a.isFile && !b.isFile) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      const treeLines = renderTree(tree, '', true, true);
+      const treeString = treeLines.join('\n');
+      const treeStringWithSpacing = '```plaintext\n' + treeString + '\n```\n\n';
+      const treeStringSize = Buffer.byteLength(treeStringWithSpacing, 'utf8');
+
+      if (maxChunkSize > 0 && currentChunkSize + treeStringSize > maxChunkSize) {
+        // Tree doesn't fit in current chunk, start a new chunk
+        outputFilesContent.unshift(treeStringWithSpacing);
+        currentChunkSize = treeStringSize;
+        currentFileIndex++;
+      } else {
+        // Add tree to the current chunk
+        outputFilesContent[0] = treeStringWithSpacing + outputFilesContent[0];
+        currentChunkSize += treeStringSize;
+      }
+    }
 
     for (const file of allFiles) {
       const fileStats = await stat(file);
@@ -342,11 +528,22 @@ async function createTextArchive(): Promise<void> {
               .join('\n');
           }
 
-          let fileHeader = `\n=== Start of File: ${relativePath} ===\n`;
-          let fileFooter = `\n=== End of File: ${relativePath} ===\n`;
-          let fileContent = content;
+          const ext = path.extname(file).toLowerCase();
+          const isMarkdown = ext === '.md' || ext === '.markdown';
+          let language = getLanguageFromExtension(ext);
 
-          let totalFileContent = fileHeader + fileContent + fileFooter;
+          let fileHeader = `\n## File: ${relativePath}\n\n`;
+          let fileContent = '';
+
+          if (isMarkdown) {
+            // Include content as-is for Markdown files
+            fileContent = content + '\n';
+          } else {
+            // Wrap content in code block for other files
+            fileContent = `\`\`\`${language}\n${content}\n\`\`\`\n`;
+          }
+
+          let totalFileContent = fileHeader + fileContent;
           let totalFileContentSize = Buffer.byteLength(totalFileContent, 'utf8');
 
           let contentPointer = 0;
@@ -373,14 +570,14 @@ async function createTextArchive(): Promise<void> {
             // Add continuation headers and footers if necessary
             if (isContinuingFile) {
               // We're continuing a file from the previous chunk
-              contentSlice = `\n=== Continuation of File: ${currentFileName} ===\n` + contentSlice;
+              contentSlice = `\n## Continuation of File: ${currentFileName}\n\n` + contentSlice;
               isContinuingFile = false;
             }
 
             // Check if we have reached the end of the file in this chunk
             if (contentPointer < totalFileContent.length) {
-              // Not at the end, so we need to add a continuation footer
-              contentSlice += `\n=== File continues in next part ===\n`;
+              // Not at the end, so we need to add a continuation notice
+              contentSlice += `\n*File continues in next part*\n`;
               isContinuingFile = true;
               currentFileName = relativePath;
             }
@@ -414,9 +611,9 @@ async function createTextArchive(): Promise<void> {
       await writeFile(outputFilePath, outputFilesContent[i], 'utf8');
     }
 
-    console.log(`Text archive created successfully with ${outputFilesContent.length} file(s).`);
+    console.log(`Markdown archive created successfully with ${outputFilesContent.length} file(s).`);
   } catch (error) {
-    console.error('Error while creating text archive:', error);
+    console.error('Error while creating markdown archive:', error);
   }
 }
 

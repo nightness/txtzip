@@ -1,5 +1,5 @@
 txtzip.json
-*.txt
+txtzip.md
 
 dist/
 node_modules

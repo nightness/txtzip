@@ -1,10 +1,18 @@
 {
   "name": "txtzip",
   "version": "1.6.2",
-  "description": "Text file bundling tool that preserves file structure",
+  "description": "Text file bundling tool that preserves file structure. Nice for sending multiple files in one shot to large language models.",
   "main": "dist/index.js",
   "type": "module",
-  "keywords": [],
+  "keywords": [
+    "prompt engineering",
+    "bundler",
+    "markdown",
+    "archive",
+    "developer",
+    "tool",
+    "text-processing"
+  ],
   "bin": {
     "txtzip": "./dist/index.js"
   },

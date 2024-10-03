@@ -30,8 +30,10 @@ You can use `txtzip` directly with `npx` or install it globally:
 
 ### Using `npx` (no installation required)
 
+**`--source` and `--output` are both optional and default to the current directory and `txtzip.md`, respectively.**
+
 ```bash
-npx txtzip --source ./your-folder --output ./your-output.md
+npx txtzip --source ./ --output ./txtzip.md
 ```
 
 ### Install globally

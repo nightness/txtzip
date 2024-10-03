@@ -493,7 +493,7 @@ async function createTextArchive(): Promise<void> {
 
       const treeLines = renderTree(tree, '', true, true);
       const treeString = treeLines.join('\n');
-      const treeStringWithSpacing = '```plaintext\n' + treeString + '\n```\n\n';
+      const treeStringWithSpacing = '## File Structure\n\n```plaintext\n' + treeString + '\n```\n';
       const treeStringSize = Buffer.byteLength(treeStringWithSpacing, 'utf8');
 
       if (maxChunkSize > 0 && currentChunkSize + treeStringSize > maxChunkSize) {

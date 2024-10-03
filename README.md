@@ -42,10 +42,12 @@ npx txtzip --source ./ --output ./txtzip.md
 npm install -g txtzip
 ```
 
-Then run:
+Then simply run:
+
+Uses the default options: **`--source` defaults to the current directory and `--output` defaults to `txtzip.md`.**
 
 ```bash
-txtzip --source ./your-folder --output ./your-output.md
+txtzip
 ```
 
 ## Usage

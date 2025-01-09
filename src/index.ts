@@ -352,7 +352,8 @@ async function getFilesRecursively(dir: string, ig: Ignore): Promise<string[]> {
 
     return files;
   } catch (error) {
-    console.error("Error while reading directory:", error);
+    // console.error("Error while reading directory:", error);
+    console.log((error as any).message);
     return [];
   }
 }
